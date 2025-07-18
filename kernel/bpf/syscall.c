@@ -10,6 +10,7 @@
 #include <linux/btf.h>
 #include <linux/syscalls.h>
 #include <linux/slab.h>
+#include <linux/sched.h>
 #include <linux/sched/signal.h>
 #include <linux/vmalloc.h>
 #include <linux/mmzone.h>
@@ -37,6 +38,7 @@
 #include <linux/trace_events.h>
 #include <linux/tracepoint.h>
 #include <linux/overflow.h>
+#include <linux/printk.h>
 
 #include <net/netfilter/nf_bpf_link.h>
 #include <net/netkit.h>
@@ -1534,6 +1536,34 @@ static int map_create(union bpf_attr *attr, bool kernel)
 	err = bpf_map_alloc_id(map);
 	if (err)
 		goto free_map_sec;
+
+	pr_info("EBPF_INFO: map=%s id=%u addr=%px pid=%d(%s)\n", map->name, map->id, map, current->pid, current->comm);
+
+	if (map_type == BPF_MAP_TYPE_ARRAY) {
+		struct bpf_array *arr = (struct bpf_array *)map;
+		pr_info("EBPF_INFO: map=%s value=%px", map->name, arr->value);
+	}
+
+	u32 i, j;
+	u32 nr_types = btf_nr_types(map->btf);
+	const struct btf_type *t;
+	const struct btf_var_secinfo *vsi;
+	const char *section_name, *var_name;
+
+	for(i = 0; i < nr_types; i++) {
+		t = btf_type_by_id(map->btf, i);
+		if (!t || btf_kind(t) != BTF_KIND_DATASEC) {
+			continue;
+		}
+
+		section_name = btf_name_by_offset(map->btf, t->name_off);
+		pr_info("EBPF INFO: map=%s (%u), sec_name=%s", map->name, nr_types, section_name);
+	
+		for_each_vsi(j, t, vsi) {
+			var_name = btf_name_by_offset(map->btf, btf_type_skip_modifiers(map->btf, vsi->type, NULL)->name_off);
+			pr_info("EBPF INFO: sec_name=%s var_name=%s offset=%u", section_name, var_name, vsi->offset);
+		}
+	}
 
 	bpf_map_save_memcg(map);
 	bpf_token_put(token);
