@@ -32,6 +32,7 @@
 #include <linux/bpf_lsm.h>
 #include <linux/poll.h>
 #include <linux/sort.h>
+#include <linux/string.h>
 #include <linux/bpf-netns.h>
 #include <linux/rcupdate_trace.h>
 #include <linux/memcontrol.h>
@@ -1337,6 +1338,22 @@ static bool bpf_net_capable(void)
 	return capable(CAP_NET_ADMIN) || capable(CAP_SYS_ADMIN);
 }
 
+static u32 internal_to_id(const char *name) {
+	size_t name_len = strlen(name);
+	const char *suffixes[] = {".bss", ".data", ".rodata"};
+
+	size_t num_suffixes = sizeof(suffixes) / sizeof(suffixes[0]);
+
+	for (u32 i = 0; i < num_suffixes; i++) {
+		size_t suf_len = strlen(suffixes[i]);
+		if (name_len >= suf_len && 
+			!strncmp(name + name_len - suf_len, suffixes[i], suf_len)) {
+			return i + 1;
+		}
+	}
+	return 0;
+}
+
 #define BPF_MAP_CREATE_LAST_FIELD map_token_fd
 /* called via syscall */
 static int map_create(union bpf_attr *attr, bool kernel)
@@ -1539,29 +1556,34 @@ static int map_create(union bpf_attr *attr, bool kernel)
 
 	pr_info("EBPF_INFO: map=%s id=%u addr=%px pid=%d(%s)\n", map->name, map->id, map, current->pid, current->comm);
 
-	if (map_type == BPF_MAP_TYPE_ARRAY) {
+	// check if it ends with an internal identifier and returns a nonzero if yes
+	u32 internal_id = internal_to_id(map->name);
+	if (map_type == BPF_MAP_TYPE_ARRAY && internal_id) {
 		struct bpf_array *arr = (struct bpf_array *)map;
-		pr_info("EBPF_INFO: map=%s value=%px", map->name, arr->value);
-	}
+		char *value = arr->value;
+		pr_info("EBPF_INFO: internal=%u map=%s", internal_id, map->name);
 
-	u32 i, j;
-	u32 nr_types = btf_nr_types(map->btf);
-	const struct btf_type *t;
-	const struct btf_var_secinfo *vsi;
-	const char *section_name, *var_name;
+		u32 i, j;
+		u32 nr_types = btf_nr_types(map->btf);
+		const struct btf_type *t;
+		const struct btf_var_secinfo *vsi;
+		const char *section_name, *var_name;
 
-	for(i = 0; i < nr_types; i++) {
-		t = btf_type_by_id(map->btf, i);
-		if (!t || btf_kind(t) != BTF_KIND_DATASEC) {
-			continue;
-		}
+		for(i = 0; i < nr_types; i++) {
+			t = btf_type_by_id(map->btf, i);
+			if (!t || btf_kind(t) != BTF_KIND_DATASEC) {
+				continue;
+			}
 
-		section_name = btf_name_by_offset(map->btf, t->name_off);
-		pr_info("EBPF INFO: map=%s (%u), sec_name=%s", map->name, nr_types, section_name);
-	
-		for_each_vsi(j, t, vsi) {
-			var_name = btf_name_by_offset(map->btf, btf_type_skip_modifiers(map->btf, vsi->type, NULL)->name_off);
-			pr_info("EBPF INFO: sec_name=%s var_name=%s offset=%u", section_name, var_name, vsi->offset);
+			section_name = btf_name_by_offset(map->btf, t->name_off);
+			if (section_name[0] != '.'
+					|| internal_to_id(section_name) != internal_id) {
+				continue;
+			}
+			for_each_vsi(j, t, vsi) {
+				var_name = btf_name_by_offset(map->btf, btf_type_skip_modifiers(map->btf, vsi->type, NULL)->name_off);
+				pr_info("EBPF INFO: var_name=%s map=%s sec_name=%s addr=%px pid=%d(%s)", var_name, map->name, section_name, value + vsi->offset, current->pid, current->comm);
+			}
 		}
 	}
 
