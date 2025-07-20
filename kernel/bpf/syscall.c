@@ -1552,16 +1552,14 @@ static int map_create(union bpf_attr *attr, bool kernel)
 
 	err = bpf_map_alloc_id(map);
 	if (err)
-		goto free_map_sec;
-
-	pr_info("EBPF_INFO: map=%s id=%u addr=%px pid=%d(%s)\n", map->name, map->id, map, current->pid, current->comm);
+		goto free_map_sec;	
 
 	// check if it ends with an internal identifier and returns a nonzero if yes
 	u32 internal_id = internal_to_id(map->name);
 	if (map_type == BPF_MAP_TYPE_ARRAY && internal_id) {
 		struct bpf_array *arr = (struct bpf_array *)map;
 		char *value = arr->value;
-		pr_info("EBPF_INFO: internal=%u map=%s", internal_id, map->name);
+		pr_info("EBPF_INFO: type=intsec name=%s addr=%px pid=%d pname=%s", map->name, value, current->pid, current->comm);
 
 		u32 i, j;
 		u32 nr_types = btf_nr_types(map->btf);
@@ -1582,9 +1580,11 @@ static int map_create(union bpf_attr *attr, bool kernel)
 			}
 			for_each_vsi(j, t, vsi) {
 				var_name = btf_name_by_offset(map->btf, btf_type_skip_modifiers(map->btf, vsi->type, NULL)->name_off);
-				pr_info("EBPF INFO: var_name=%s map=%s sec_name=%s addr=%px pid=%d(%s)", var_name, map->name, section_name, value + vsi->offset, current->pid, current->comm);
+				pr_info("EBPF INFO: type=intvar name=%s sec_name=%s addr=%px pid=%d pname=%s", var_name, section_name, value + vsi->offset, current->pid, current->comm);
 			}
 		}
+	} else {
+		pr_info("EBPF_INFO: type=map name=%s addr=%px pid=%d pname=%s\n", map->name, map, current->pid, current->comm);
 	}
 
 	bpf_map_save_memcg(map);
