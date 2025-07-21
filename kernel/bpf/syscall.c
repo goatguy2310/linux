@@ -1559,8 +1559,7 @@ static int map_create(union bpf_attr *attr, bool kernel)
 	if (map_type == BPF_MAP_TYPE_ARRAY && internal_id) {
 		struct bpf_array *arr = (struct bpf_array *)map;
 		char *value = arr->value;
-		pr_info("EBPF_INFO: type=intsec name=%s addr=%px pid=%d pname=%s", map->name, value, current->pid, current->comm);
-
+		
 		u32 i, j;
 		u32 nr_types = btf_nr_types(map->btf);
 		const struct btf_type *t;
@@ -1580,9 +1579,12 @@ static int map_create(union bpf_attr *attr, bool kernel)
 			}
 			for_each_vsi(j, t, vsi) {
 				var_name = btf_name_by_offset(map->btf, btf_type_skip_modifiers(map->btf, vsi->type, NULL)->name_off);
-				pr_info("EBPF INFO: type=intvar name=%s sec_name=%s addr=%px pid=%d pname=%s", var_name, section_name, value + vsi->offset, current->pid, current->comm);
+				pr_info("EBPF_INFO: type=intvar name=%s sec_name=%s addr=%px pid=%d pname=%s", var_name, section_name, value + vsi->offset, current->pid, current->comm);
 			}
+			break;
 		}
+		pr_info("EBPF_INFO: type=intsec name=%s sec_name=%s addr=%px pid=%d pname=%s", map->name, section_name, value, current->pid, current->comm);
+
 	} else {
 		pr_info("EBPF_INFO: type=map name=%s addr=%px pid=%d pname=%s\n", map->name, map, current->pid, current->comm);
 	}
@@ -2810,7 +2812,7 @@ static bool is_perfmon_prog_type(enum bpf_prog_type prog_type)
 #define BPF_PROG_LOAD_LAST_FIELD fd_array_cnt
 
 static int bpf_prog_load(union bpf_attr *attr, bpfptr_t uattr, u32 uattr_size)
-{
+{	
 	enum bpf_prog_type type = attr->prog_type;
 	struct bpf_prog *prog, *dst_prog = NULL;
 	struct btf *attach_btf = NULL;
@@ -5425,8 +5427,11 @@ static int link_create(union bpf_attr *attr, bpfptr_t uattr)
 	if (ret)
 		goto out;
 
+	pr_info("EBPF_INFO: type=attaching pid=%d pname=%s", current->pid, current->comm);
+
 	switch (prog->type) {
 	case BPF_PROG_TYPE_CGROUP_SKB:
+
 	case BPF_PROG_TYPE_CGROUP_SOCK:
 	case BPF_PROG_TYPE_CGROUP_SOCK_ADDR:
 	case BPF_PROG_TYPE_SOCK_OPS:
