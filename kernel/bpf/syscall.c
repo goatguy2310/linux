@@ -77,6 +77,8 @@ static const struct bpf_map_ops * const bpf_map_types[] = {
 #undef BPF_LINK_TYPE
 };
 
+extern const struct bpf_verifier_ops * bpf_verifier_ops[];
+
 /*
  * If we're handed a bigger struct than we know of, ensure all the unknown bits
  * are 0 - i.e. new user-space does not rely on any kernel feature extensions
@@ -3056,6 +3058,35 @@ static int bpf_prog_load(union bpf_attr *attr, bpfptr_t uattr, u32 uattr_size)
 	err = bpf_prog_new_fd(prog);
 	if (err < 0)
 		bpf_prog_put(prog);
+
+	/* JB: Printing all helper func addr
+	commentting for now because helper func name and prog table is extracted */
+
+	// check if this is a real program (test program does not have many instructions or a long prog_name	
+	if (attr->insn_cnt > 2 && attr->prog_name && attr->prog_name[0] != '\0') {
+		/*
+		u32 prog_type, helper_id;
+		for (prog_type = 0; prog_type <= __MAX_BPF_PROG_TYPE; prog_type++) {
+			const struct bpf_verifier_ops *ops = bpf_verifier_ops[prog_type];
+
+			if (!ops || !ops->get_func_proto)
+				continue;
+			
+			for (helper_id = 0; helper_id <= __BPF_FUNC_MAX_ID; helper_id++) {
+				    const struct bpf_func_proto *proto;
+
+				    proto = ops->get_func_proto(helper_id, prog);
+
+				    if (proto && proto->func) {
+					pr_info("EBPF_INFO: type=map_log prog_type=%u helper_id=%u addr=%px",
+						prog_type, helper_id, proto->func);
+				    }
+			}
+		}
+		*/
+		pr_info("EBPF_INFO: type=load_end cur_prog_type=%u pid=%d", type, current->pid);
+	}
+
 	return err;
 
 free_used_maps:
@@ -5426,8 +5457,6 @@ static int link_create(union bpf_attr *attr, bpfptr_t uattr)
 						attr->link_create.attach_type);
 	if (ret)
 		goto out;
-
-	pr_info("EBPF_INFO: type=attaching pid=%d pname=%s", current->pid, current->comm);
 
 	switch (prog->type) {
 	case BPF_PROG_TYPE_CGROUP_SKB:
