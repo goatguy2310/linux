@@ -1581,11 +1581,11 @@ static int map_create(union bpf_attr *attr, bool kernel)
 			}
 			for_each_vsi(j, t, vsi) {
 				var_name = btf_name_by_offset(map->btf, btf_type_skip_modifiers(map->btf, vsi->type, NULL)->name_off);
-				pr_info("EBPF_INFO: type=intvar name=%s sec_name=%s addr=%px pid=%d pname=%s", var_name, section_name, value + vsi->offset, current->pid, current->comm);
+				pr_info("EBPF_INFO: type=intvar name=%s sec_name=%s addr=%px pid=%d pname=%s\n", var_name, section_name, value + vsi->offset, current->pid, current->comm);
 			}
 			break;
 		}
-		pr_info("EBPF_INFO: type=intsec name=%s sec_name=%s addr=%px pid=%d pname=%s", map->name, section_name, value, current->pid, current->comm);
+		pr_info("EBPF_INFO: type=intsec name=%s sec_name=%s addr=%px pid=%d pname=%s\n", map->name, section_name, value, current->pid, current->comm);
 
 	} else {
 		pr_info("EBPF_INFO: type=map name=%s addr=%px pid=%d pname=%s\n", map->name, map, current->pid, current->comm);
@@ -2814,7 +2814,7 @@ static bool is_perfmon_prog_type(enum bpf_prog_type prog_type)
 #define BPF_PROG_LOAD_LAST_FIELD fd_array_cnt
 
 static int bpf_prog_load(union bpf_attr *attr, bpfptr_t uattr, u32 uattr_size)
-{	
+{
 	enum bpf_prog_type type = attr->prog_type;
 	struct bpf_prog *prog, *dst_prog = NULL;
 	struct btf *attach_btf = NULL;
@@ -3057,35 +3057,7 @@ static int bpf_prog_load(union bpf_attr *attr, bpfptr_t uattr, u32 uattr_size)
 
 	err = bpf_prog_new_fd(prog);
 	if (err < 0)
-		bpf_prog_put(prog);
-
-	/* JB: Printing all helper func addr
-	commentting for now because helper func name and prog table is extracted */
-
-	// check if this is a real program (test program does not have many instructions or a long prog_name	
-	if (attr->insn_cnt > 2 && attr->prog_name && attr->prog_name[0] != '\0') {
-		/*
-		u32 prog_type, helper_id;
-		for (prog_type = 0; prog_type <= __MAX_BPF_PROG_TYPE; prog_type++) {
-			const struct bpf_verifier_ops *ops = bpf_verifier_ops[prog_type];
-
-			if (!ops || !ops->get_func_proto)
-				continue;
-			
-			for (helper_id = 0; helper_id <= __BPF_FUNC_MAX_ID; helper_id++) {
-				    const struct bpf_func_proto *proto;
-
-				    proto = ops->get_func_proto(helper_id, prog);
-
-				    if (proto && proto->func) {
-					pr_info("EBPF_INFO: type=map_log prog_type=%u helper_id=%u addr=%px",
-						prog_type, helper_id, proto->func);
-				    }
-			}
-		}
-		*/
-		pr_info("EBPF_INFO: type=load_end cur_prog_type=%u pid=%d", type, current->pid);
-	}
+		bpf_prog_put(prog);	
 
 	return err;
 
@@ -5460,7 +5432,6 @@ static int link_create(union bpf_attr *attr, bpfptr_t uattr)
 
 	switch (prog->type) {
 	case BPF_PROG_TYPE_CGROUP_SKB:
-
 	case BPF_PROG_TYPE_CGROUP_SOCK:
 	case BPF_PROG_TYPE_CGROUP_SOCK_ADDR:
 	case BPF_PROG_TYPE_SOCK_OPS:
@@ -5534,9 +5505,36 @@ static int link_create(union bpf_attr *attr, bpfptr_t uattr)
 		ret = -EINVAL;
 	}
 
-out:
+out:	
 	if (ret < 0)
 		bpf_prog_put(prog);
+	else if (prog->aux->verified_insns > 2 && prog->aux->name && prog->aux->name[0] != '\0') {
+		/* JB: Printing all helper func addr
+		commenting for now because helper func name and prog table is extracted */
+	
+		/*
+		u32 prog_type, helper_id;
+		for (prog_type = 0; prog_type <= __MAX_BPF_PROG_TYPE; prog_type++) {
+			const struct bpf_verifier_ops *ops = bpf_verifier_ops[prog_type];
+
+			if (!ops || !ops->get_func_proto)
+				continue;
+			
+			for (helper_id = 0; helper_id <= __BPF_FUNC_MAX_ID; helper_id++) {
+				    const struct bpf_func_proto *proto;
+
+				    proto = ops->get_func_proto(helper_id, prog);
+
+				    if (proto && proto->func) {
+					pr_info("EBPF_INFO: type=map_log prog_type=%u helper_id=%u addr=%px\n",
+						prog_type, helper_id, proto->func);
+				    }
+			}
+		}
+		*/
+		pr_info("EBPF_INFO: type=load_end prog_name=%s cur_prog_type=%u prog_addr=%px pid=%d\n", prog->aux->name, prog->type, prog, current->pid);
+	}
+
 	return ret;
 }
 

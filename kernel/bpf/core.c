@@ -1071,11 +1071,13 @@ void *__weak bpf_jit_alloc_exec(unsigned long size)
 {
 	return execmem_alloc(EXECMEM_BPF, size);
 }
+EXPORT_SYMBOL_GPL(bpf_jit_alloc_exec);
 
 void __weak bpf_jit_free_exec(void *addr)
 {
 	execmem_free(addr);
 }
+EXPORT_SYMBOL_GPL(bpf_jit_free_exec);
 
 struct bpf_binary_header *
 bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
