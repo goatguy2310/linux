@@ -3058,7 +3058,18 @@ static int bpf_prog_load(union bpf_attr *attr, bpfptr_t uattr, u32 uattr_size)
 	err = bpf_prog_new_fd(prog);
 	if (err < 0)
 		bpf_prog_put(prog);	
-
+	else {
+		// JB: Log prog info
+		char prog_tag[sizeof(prog->tag) * 2 + 1] = { };
+		bin2hex(prog_tag, prog->tag, sizeof(prog->tag));
+		pr_info("EBPF_INFO: type=load_m prog_name=%s cur_prog_type=%u prog_tag=%s prog_id=%u prog_addr=%px pid=%d\n",
+				prog->aux->name,
+				prog->type,
+				prog_tag,
+				prog->aux->id,
+				prog,
+				current->pid);
+	}
 	return err;
 
 free_used_maps:
